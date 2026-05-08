@@ -16,6 +16,8 @@ import os
 import sys
 import datetime
 import base64
+import shutil
+from huggingface_hub import hf_hub_download
 from src.predict import load_and_preprocess_image
 import tempfile
 
@@ -35,21 +37,40 @@ os.makedirs("static/js", exist_ok=True)
 os.makedirs("templates", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# ── Model Check ───────────────────────────────────────────────────────────────
-def check_models():
-    """Verify model files exist — they are bundled in the repo via Git LFS."""
+# ── Model Download ────────────────────────────────────────────────────────────
+MODEL_REPO = "adarshtiwarri/DiagnosticHub"
+MODEL_FILES = {
+    "advanced_best.h5": "models/advanced_best.h5",
+    "baseline_best.h5": "models/baseline_best.h5",
+}
+
+def ensure_models():
+    """
+    Download model .h5 files from HuggingFace Hub via HTTP (not git-lfs).
+    This is reliable inside Docker containers on HF Spaces where git-lfs
+    is not available during the build phase.
+    """
     os.makedirs("models", exist_ok=True)
-    missing = []
-    for name in ["advanced_best.h5", "baseline_best.h5"]:
-        path = os.path.join("models", name)
-        if not os.path.exists(path):
-            missing.append(name)
-        else:
-            size_mb = os.path.getsize(path) / 1024 / 1024
-            print(f"[OK] {name} — {size_mb:.1f} MB")
-    if missing:
-        print(f"[WARNING] Missing model files: {missing}", file=sys.stderr)
-        print("[WARNING] Predictions will fail until models are present.", file=sys.stderr)
+    for local_name, repo_path in MODEL_FILES.items():
+        local_path = os.path.join("models", local_name)
+        # Check if file exists AND is a real model (>1 MB), not a git-lfs pointer
+        if os.path.exists(local_path) and os.path.getsize(local_path) > 1_000_000:
+            size_mb = os.path.getsize(local_path) / 1024 / 1024
+            print(f"[OK] {local_name} — {size_mb:.1f} MB (cached)")
+            continue
+        print(f"[DOWNLOAD] {local_name} from HuggingFace Hub...")
+        try:
+            downloaded = hf_hub_download(
+                repo_id=MODEL_REPO,
+                filename=repo_path,
+                repo_type="space",
+                local_dir="/tmp/hf_models",
+            )
+            shutil.copy(downloaded, local_path)
+            size_mb = os.path.getsize(local_path) / 1024 / 1024
+            print(f"[OK] {local_name} — {size_mb:.1f} MB downloaded successfully")
+        except Exception as e:
+            print(f"[ERROR] Could not download {local_name}: {e}", file=sys.stderr)
 
 # ── Model Cache ───────────────────────────────────────────────────────────────
 _model_cache: dict = {}
@@ -109,7 +130,7 @@ def image_to_base64(arr: np.ndarray) -> str:
 # ── Startup ───────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup_event():
-    check_models()
+    ensure_models()
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
