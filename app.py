@@ -129,7 +129,7 @@ def load_selected_engine(choice):
     model(np.zeros((1, 224, 224, 3)))
     return model
 
-# --- SIDEBAR NAVIGATION ---get_mapping(model, img_array):
+def get_mapping(model, img_array):
     # This version is model-agnostic (works for both ResNet and Baseline)
     try:
         # Check if it's a nested model (like our ResNet implementation)
