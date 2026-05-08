@@ -130,48 +130,55 @@ def load_selected_engine(choice):
     return model
 
 def get_mapping(model, img_array):
-    # This version is model-agnostic (works for both ResNet and Baseline)
     try:
-        # Check if it's a nested model (like our ResNet implementation)
-        if any(isinstance(l, tf.keras.Model) or l.name == 'resnet50v2' for l in model.layers):
-            target_model = model.get_layer('resnet50v2') if 'resnet50v2' in [l.name for l in model.layers] else model
+        # 1. Identify the core model for feature extraction
+        # If it's the ResNet wrapper, we need the internal 'resnet50v2' layer
+        if 'resnet50v2' in [l.name for l in model.layers]:
+            target_model = model.get_layer('resnet50v2')
         else:
             target_model = model
 
-        # Find the last convolutional layer in the target model
-        last_conv = None
+        # 2. Find the last convolutional layer
+        last_conv_layer = None
         for layer in reversed(target_model.layers):
             if isinstance(layer, tf.keras.layers.Conv2D):
-                last_conv = layer.name
+                last_conv_layer = layer
                 break
         
-        if not last_conv:
+        if not last_conv_layer:
             return None
 
-        # Create a sub-model for Grad-CAM
+        # 3. Build Grad-Model
+        # For Keras 3 compatibility, we use the functional API carefully
         grad_model = tf.keras.models.Model(
-            [target_model.input], 
-            [target_model.get_layer(last_conv).output, target_model.output]
+            inputs=[target_model.input],
+            outputs=[last_conv_layer.output, target_model.output]
         )
 
-        # Gradient calculation
+        # 4. Gradient Calculation
         with tf.GradientTape() as tape:
-            # If target_model is the whole model, use img_array directly
-            # If target_model is a sub-part, we might need to handle inputs differently, 
-            # but for our architecture, the inputs are shared.
-            conv_out, preds = grad_model(img_array)
-            loss = preds[:, 0]
+            # For the baseline model, we might need to handle the input differently 
+            # if it's a wrapper, but here we use target_model.input
+            conv_outs, predictions = grad_model(img_array)
+            # Binary classification: target the single output neuron
+            loss = predictions[:, 0]
+
+        # Extract gradients and feature maps
+        grads = tape.gradient(loss, conv_outs)[0]
+        pooled_grads = tf.reduce_mean(grads, axis=(0, 1))
         
-        grads = tape.gradient(loss, conv_out)[0]
-        output = conv_out[0]
-        
-        weights = tf.reduce_mean(grads, axis=(0, 1))
-        cam = np.dot(output, weights)
-        cam = cv2.resize(cam, (500, 500))
-        cam = np.maximum(cam, 0)
-        return (cam - cam.min()) / (cam.max() - cam.min() + 1e-10)
+        conv_outs = conv_outs[0]
+        heatmap = conv_outs @ pooled_grads[..., tf.newaxis]
+        heatmap = tf.squeeze(heatmap)
+
+        # 5. Clean & Normalize
+        heatmap = tf.maximum(heatmap, 0) / (tf.math.reduce_max(heatmap) + 1e-10)
+        return heatmap.numpy()
+
     except Exception as e:
-        st.error(f"Mapping Error: {str(e)}")
+        # If the functional API fails (common in Keras 3 with Sequential models),
+        # we provide a fallback or clear error.
+        st.error(f"Engine Mapping Error: {str(e)}")
         return None
 
 def generate_report(prediction, confidence, risk):
