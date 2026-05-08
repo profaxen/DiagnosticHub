@@ -219,8 +219,9 @@ if page == "DIAGNOSTIC DASHBOARD":
         
         if file:
             img = Image.open(file).convert("RGB")
+            # Force Resize for UI consistency
             display_img = img.resize((500, 500))
-            st.image(display_img, use_container_width=True, caption="Active Patient Radiograph")
+            st.image(display_img, width='stretch', caption="Active Patient Radiograph")
             img.save("temp_buffer.jpg")
             
             if st.button("RUN CLINICAL ANALYSIS"):
@@ -262,7 +263,7 @@ if page == "DIAGNOSTIC DASHBOARD":
         st.write("Spatial visualization of radiographic markers detected by the AI.")
         v1, v2 = st.columns(2)
         with v1:
-            st.image(display_img, use_container_width=True, caption="Radiograph")
+            st.image(display_img, width='stretch', caption="Radiograph")
         with v2:
             heatmap = get_mapping(model, processed_img)
             orig = cv2.imread("temp_buffer.jpg")
@@ -271,7 +272,7 @@ if page == "DIAGNOSTIC DASHBOARD":
             hm = cv2.applyColorMap(np.uint8(255 * cv2.resize(heatmap, (500, 500))), cv2.COLORMAP_JET)
             hm = cv2.cvtColor(hm, cv2.COLOR_BGR2RGB)
             overlay = cv2.addWeighted(orig, 0.6, hm, 0.4, 0)
-            st.image(overlay, use_container_width=True, caption="AI Pathological Mapping")
+            st.image(overlay, width='stretch', caption="AI Pathological Mapping")
         st.markdown('</div>', unsafe_allow_html=True)
 
 # --- PAGE: SYSTEM ANALYTICS ---
