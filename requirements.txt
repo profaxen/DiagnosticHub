@@ -7,6 +7,8 @@ scikit-learn
 opencv-python-headless
 pillow
 scipy
-streamlit
 plotly
 gdown
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9

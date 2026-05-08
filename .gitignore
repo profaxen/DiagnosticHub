@@ -8,6 +8,7 @@ env/
 __pycache__/
 *.py[cod]
 *$py.class
+src/__pycache__/
 
 # Data (Crucial: Do not upload massive dataset to GitHub)
 data/
@@ -16,18 +17,23 @@ scan_buffer.jpg
 temp_pro.jpg
 temp_upload.jpg
 active_scan.jpg
+*.tmp
 
 # OS files
 .DS_Store
 Thumbs.db
 
-# Exclude internal dev/interview docs as requested
+# Exclude internal dev/interview docs
 TECHNICAL_SPECS.md
 DEVELOPMENT_LOG.md
 INTERVIEW_PREP.md
-DEPLOYMENT.md
 src/analyze_data.py
 src/utils.py
 
-# Models (EXCLUDED DUE TO 100MB GITHUB LIMIT)
+# Models (downloaded at runtime from Google Drive — NOT in repo)
 models/*.h5
+
+# Runtime / IDE
+.idea/
+.vscode/
+*.log
