@@ -10,3 +10,4 @@ scipy
 streamlit
 plotly
 opencv-python-headless
+gdown

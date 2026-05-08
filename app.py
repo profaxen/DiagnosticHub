@@ -9,6 +9,29 @@ import datetime
 import plotly.graph_objects as go
 import plotly.express as px
 from src.predict import load_and_preprocess_image
+import gdown
+
+# --- GOOGLE DRIVE DOWNLOAD LOGIC ---
+@st.cache_resource
+def download_models_from_drive():
+    model_dir = 'models'
+    os.makedirs(model_dir, exist_ok=True)
+    
+    advanced_path = os.path.join(model_dir, 'advanced_best.h5')
+    baseline_path = os.path.join(model_dir, 'baseline_best.h5')
+    
+    # Advanced Model ID: 1u4WaQNN-tHTAqJsOkkjAyhwrstBrfm83
+    # Baseline Model ID: 1AXS9Z-RRVEl2tP4ZORw9RnKUM0hV2zKK
+    
+    if not os.path.exists(advanced_path):
+        with st.spinner("Downloading Advanced Engine from Cloud (250MB)..."):
+            url = f'https://drive.google.com/uc?id=1u4WaQNN-tHTAqJsOkkjAyhwrstBrfm83'
+            gdown.download(url, advanced_path, quiet=False)
+            
+    if not os.path.exists(baseline_path):
+        with st.spinner("Downloading Baseline Engine from Cloud (120MB)..."):
+            url = f'https://drive.google.com/uc?id=1AXS9Z-RRVEl2tP4ZORw9RnKUM0hV2zKK'
+            gdown.download(url, baseline_path, quiet=False)
 
 # --- PAGE CONFIG ---
 st.set_page_config(
@@ -16,6 +39,9 @@ st.set_page_config(
     page_icon="🔬",
     layout="wide",
 )
+
+# Trigger download before anything else
+download_models_from_drive()
 
 # --- LUXURY DESIGN SYSTEM v4.0 (Multi-Module Product) ---
 st.markdown("""
