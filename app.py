@@ -222,20 +222,23 @@ purposes only.
     """
     return report_text.strip()
 
-# --- SIDEBAR NAVIGATION ---
+# --- NAVIGATION LOGIC ---
+if 'page' not in st.session_state:
+    st.session_state['page'] = "DIAGNOSTIC DASHBOARD"
+
+# --- SIDEBAR NAVIGATION (FORCED VISIBILITY) ---
 with st.sidebar:
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.image("https://cdn-icons-png.flaticon.com/512/3063/3063206.png", width=60)
     st.markdown("### PNEUMOSCAN CONTROL")
     
-    # Navigation Selection
-    page = st.selectbox(
-        "NAVIGATION",
+    # Use a radio button instead of selectbox for better visibility in sidebar
+    st.session_state['page'] = st.radio(
+        "GO TO MODULE",
         ["DIAGNOSTIC DASHBOARD", "SYSTEM ANALYTICS", "DATASET INTELLIGENCE", "ARCHITECT SPECS"],
-        index=0
+        key="navigation_radio"
     )
     
-    # Engine Selection
     st.markdown("---")
     st.markdown("### ENGINE SETTINGS")
     engine_choice = st.radio("SELECT ENGINE", ["PRO (ResNet)", "BASE (CNN)"], index=0)
@@ -248,6 +251,8 @@ with st.sidebar:
     st.markdown("---")
     st.caption("PROPRIETARY SYSTEM")
     st.caption("DESIGNED BY ADARSH")
+
+page = st.session_state['page']
 
 # --- PAGE: DIAGNOSTIC DASHBOARD ---
 if page == "DIAGNOSTIC DASHBOARD":
