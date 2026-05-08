@@ -298,18 +298,29 @@ if page == "DIAGNOSTIC DASHBOARD":
         st.markdown('<div class="product-card">', unsafe_allow_html=True)
         st.markdown("#### 03. Neural Attention Mapping")
         st.write("Spatial visualization of radiographic markers detected by the AI.")
-        v1, v2 = st.columns(2)
-        with v1:
-            st.image(display_img, width='stretch', caption="Radiograph")
-        with v2:
-            heatmap = get_mapping(model, processed_img)
-            orig = cv2.imread("temp_buffer.jpg")
-            orig = cv2.cvtColor(orig, cv2.COLOR_BGR2RGB)
-            orig = cv2.resize(orig, (500, 500))
-            hm = cv2.applyColorMap(np.uint8(255 * cv2.resize(heatmap, (500, 500))), cv2.COLORMAP_JET)
-            hm = cv2.cvtColor(hm, cv2.COLOR_BGR2RGB)
-            overlay = cv2.addWeighted(orig, 0.6, hm, 0.4, 0)
-            st.image(overlay, width='stretch', caption="AI Pathological Mapping")
+        
+        heatmap = get_mapping(model, processed_img)
+        
+        if heatmap is not None:
+            v1, v2 = st.columns(2)
+            with v1:
+                st.image(display_img, width='stretch', caption="Radiograph")
+            with v2:
+                orig = cv2.imread("temp_buffer.jpg")
+                orig = cv2.cvtColor(orig, cv2.COLOR_BGR2RGB)
+                orig = cv2.resize(orig, (500, 500))
+                
+                # Fixed: Use consistent 500x500 sizing for heatmap processing
+                heatmap_resized = cv2.resize(heatmap, (500, 500))
+                hm = cv2.applyColorMap(np.uint8(255 * heatmap_resized), cv2.COLORMAP_JET)
+                hm = cv2.cvtColor(hm, cv2.COLOR_BGR2RGB)
+                
+                overlay = cv2.addWeighted(orig, 0.6, hm, 0.4, 0)
+                st.image(overlay, width='stretch', caption="AI Pathological Mapping")
+        else:
+            st.warning("⚠️ Pathological mapping is currently unavailable for this engine/image combination.")
+            st.image(display_img, width='stretch', caption="Patient Radiograph")
+            
         st.markdown('</div>', unsafe_allow_html=True)
 
 # --- PAGE: SYSTEM ANALYTICS ---
