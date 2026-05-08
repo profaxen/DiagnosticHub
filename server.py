@@ -13,10 +13,9 @@ import cv2
 from PIL import Image
 import io
 import os
+import sys
 import datetime
 import base64
-import gdown
-from functools import lru_cache
 from src.predict import load_and_preprocess_image
 import tempfile
 
@@ -36,19 +35,21 @@ os.makedirs("static/js", exist_ok=True)
 os.makedirs("templates", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# ── Model Download ────────────────────────────────────────────────────────────
-def download_models():
-    model_dir = "models"
-    os.makedirs(model_dir, exist_ok=True)
-    files = {
-        "advanced_best.h5": "1u4WaQNN-tHTAqJsOkkjAyhwrstBrfm83",
-        "baseline_best.h5": "1AXS9Z-RRVEl2tP4ZORw9RnKUM0hV2zKK",
-    }
-    for name, fid in files.items():
-        path = os.path.join(model_dir, name)
+# ── Model Check ───────────────────────────────────────────────────────────────
+def check_models():
+    """Verify model files exist — they are bundled in the repo via Git LFS."""
+    os.makedirs("models", exist_ok=True)
+    missing = []
+    for name in ["advanced_best.h5", "baseline_best.h5"]:
+        path = os.path.join("models", name)
         if not os.path.exists(path):
-            print(f"Downloading {name}...")
-            gdown.download(f"https://drive.google.com/uc?id={fid}", path, quiet=False)
+            missing.append(name)
+        else:
+            size_mb = os.path.getsize(path) / 1024 / 1024
+            print(f"[OK] {name} — {size_mb:.1f} MB")
+    if missing:
+        print(f"[WARNING] Missing model files: {missing}", file=sys.stderr)
+        print("[WARNING] Predictions will fail until models are present.", file=sys.stderr)
 
 # ── Model Cache ───────────────────────────────────────────────────────────────
 _model_cache: dict = {}
@@ -108,7 +109,7 @@ def image_to_base64(arr: np.ndarray) -> str:
 # ── Startup ───────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup_event():
-    download_models()
+    check_models()
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
