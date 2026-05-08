@@ -120,28 +120,59 @@ st.markdown("""
     .block-container { padding-top: 2rem !important; }
 </style>
 """, unsafe_allow_html=True)
-
-# --- UTILITIES ---
 @st.cache_resource
-def load_main_engine():
-    model = tf.keras.models.load_model('models/advanced_best.h5')
+def load_selected_engine(choice):
+    if choice == "PRO (ResNet)":
+        model = tf.keras.models.load_model('models/advanced_best.h5')
+    else:
+        model = tf.keras.models.load_model('models/baseline_best.h5')
     model(np.zeros((1, 224, 224, 3)))
     return model
 
-def get_mapping(model, img_array):
-    resnet = model.get_layer('resnet50v2')
-    last_conv = next(l.name for l in reversed(resnet.layers) if isinstance(l, tf.keras.layers.Conv2D))
-    grad_model = tf.keras.models.Model([resnet.input], [resnet.get_layer(last_conv).output, resnet.output])
-    with tf.GradientTape() as tape:
-        conv_out, preds = grad_model(img_array)
-        loss = preds[:, 0]
-    grads = tape.gradient(loss, conv_out)[0]
-    output = conv_out[0]
-    weights = tf.reduce_mean(grads, axis=(0, 1))
-    cam = np.dot(output, weights)
-    cam = cv2.resize(cam, (500, 500))
-    cam = np.maximum(cam, 0)
-    return (cam - cam.min()) / (cam.max() - cam.min() + 1e-10)
+# --- SIDEBAR NAVIGATION ---get_mapping(model, img_array):
+    # This version is model-agnostic (works for both ResNet and Baseline)
+    try:
+        # Check if it's a nested model (like our ResNet implementation)
+        if any(isinstance(l, tf.keras.Model) or l.name == 'resnet50v2' for l in model.layers):
+            target_model = model.get_layer('resnet50v2') if 'resnet50v2' in [l.name for l in model.layers] else model
+        else:
+            target_model = model
+
+        # Find the last convolutional layer in the target model
+        last_conv = None
+        for layer in reversed(target_model.layers):
+            if isinstance(layer, tf.keras.layers.Conv2D):
+                last_conv = layer.name
+                break
+        
+        if not last_conv:
+            return None
+
+        # Create a sub-model for Grad-CAM
+        grad_model = tf.keras.models.Model(
+            [target_model.input], 
+            [target_model.get_layer(last_conv).output, target_model.output]
+        )
+
+        # Gradient calculation
+        with tf.GradientTape() as tape:
+            # If target_model is the whole model, use img_array directly
+            # If target_model is a sub-part, we might need to handle inputs differently, 
+            # but for our architecture, the inputs are shared.
+            conv_out, preds = grad_model(img_array)
+            loss = preds[:, 0]
+        
+        grads = tape.gradient(loss, conv_out)[0]
+        output = conv_out[0]
+        
+        weights = tf.reduce_mean(grads, axis=(0, 1))
+        cam = np.dot(output, weights)
+        cam = cv2.resize(cam, (500, 500))
+        cam = np.maximum(cam, 0)
+        return (cam - cam.min()) / (cam.max() - cam.min() + 1e-10)
+    except Exception as e:
+        st.error(f"Mapping Error: {str(e)}")
+        return None
 
 def generate_report(prediction, confidence, risk):
     status = "POSITIVE" if prediction > 0.5 else "NEGATIVE"
@@ -190,11 +221,17 @@ with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3063/3063206.png", width=60)
     st.markdown("### PNEUMOSCAN CONTROL")
     
+    # Navigation Selection
     page = st.selectbox(
         "NAVIGATION",
         ["DIAGNOSTIC DASHBOARD", "SYSTEM ANALYTICS", "DATASET INTELLIGENCE", "ARCHITECT SPECS"],
         index=0
     )
+    
+    # Engine Selection
+    st.markdown("---")
+    st.markdown("### ENGINE SETTINGS")
+    engine_choice = st.radio("SELECT ENGINE", ["PRO (ResNet)", "BASE (CNN)"], index=0)
     
     st.markdown("---")
     st.markdown("### CLINICAL STATUS")
@@ -231,7 +268,7 @@ if page == "DIAGNOSTIC DASHBOARD":
     with c2:
         if file and st.session_state.get('analyze_v4'):
             with st.spinner("Processing..."):
-                model = load_main_engine()
+                model = load_selected_engine(engine_choice)
                 processed_img = load_and_preprocess_image("temp_buffer.jpg")
                 score = model.predict(processed_img, verbose=0)[0][0]
                 risk = "CRITICAL" if score > 0.7 else "MODERATE" if score > 0.4 else "LOW"
